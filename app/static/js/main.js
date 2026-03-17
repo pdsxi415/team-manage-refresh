@@ -30,11 +30,18 @@ function applySystemTheme(themeName) {
     body.dataset.uiTheme = normalized;
     body.classList.remove('theme-ocean', 'theme-warm');
     body.classList.add(`theme-${normalized}`);
+    document.documentElement.classList.remove('theme-ocean', 'theme-warm');
+    document.documentElement.classList.add(`theme-${normalized}`);
 }
 
 function getCurrentSystemTheme() {
     const bodyTheme = document.body?.dataset?.uiTheme;
     if (bodyTheme === 'warm' || bodyTheme === 'ocean') return bodyTheme;
+    try {
+        const saved = localStorage.getItem('ui_theme');
+        if (saved === 'warm' || saved === 'ocean') return saved;
+    } catch (e) {}
+    if (window.__EARLY_UI_THEME === 'warm' || window.__EARLY_UI_THEME === 'ocean') return window.__EARLY_UI_THEME;
     if (window.SYSTEM_UI_THEME === 'warm' || window.SYSTEM_UI_THEME === 'ocean') return window.SYSTEM_UI_THEME;
     return 'ocean';
 }
@@ -93,6 +100,7 @@ async function initThemeSwitcher() {
         try {
             const savedTheme = await saveSystemTheme(nextTheme);
             applySystemTheme(savedTheme);
+            try { localStorage.setItem('ui_theme', savedTheme); } catch (e) {}
             updateThemeToggleButton(savedTheme);
             showToast(`已切换为${savedTheme === 'warm' ? '暖色' : '深色'}主题`, 'success');
         } catch (error) {

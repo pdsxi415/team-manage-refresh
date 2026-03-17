@@ -97,7 +97,8 @@ body.admin-theme {
     color: var(--text-main);
 }
 
-body.admin-theme.theme-warm {
+body.admin-theme.theme-warm,
+html.theme-warm body.admin-theme {
     --primary: #d4692a;
     --primary-hover: #b8521c;
     --primary-soft: #fdeeDE;
@@ -1756,11 +1757,13 @@ body {
 }
 
 
-body.admin-theme.theme-warm .data-table th {
+body.admin-theme.theme-warm .data-table th,
+html.theme-warm body.admin-theme .data-table th {
     background: #faf6f0;
 }
 
-body.admin-theme.theme-warm .status-badge.status-banned {
+body.admin-theme.theme-warm .status-badge.status-banned,
+html.theme-warm body.admin-theme .status-badge.status-banned {
     background: #f5efe6;
 }
 
@@ -1779,34 +1782,47 @@ body.admin-theme.theme-warm .status-badge.status-banned {
 .theme-option-card small { color: var(--text-muted); }
 
 
-body.admin-theme.theme-warm .stat-card {
+body.admin-theme.theme-warm .stat-card,
+html.theme-warm body.admin-theme .stat-card {
     background: #fffaf5;
     border-color: #eadfce;
 }
 
-body.admin-theme.theme-warm .menu-item.active a {
+body.admin-theme.theme-warm .menu-item.active a,
+html.theme-warm body.admin-theme .menu-item.active a {
     box-shadow: inset 0 0 0 1px rgba(212, 105, 42, 0.24);
 }
 
 body.admin-theme.theme-warm .menu-item .menu-icon,
+html.theme-warm body.admin-theme .menu-item .menu-icon,
 body.admin-theme.theme-warm .navbar-user,
+html.theme-warm body.admin-theme .navbar-user,
 body.admin-theme.theme-warm .text-muted,
+html.theme-warm body.admin-theme .text-muted,
 body.admin-theme.theme-warm .small,
-body.admin-theme.theme-warm .stat-label {
+html.theme-warm body.admin-theme .small,
+body.admin-theme.theme-warm .stat-label,
+html.theme-warm body.admin-theme .stat-label {
     color: var(--text-muted);
 }
 
-body.admin-theme.theme-warm .btn-secondary {
+body.admin-theme.theme-warm .btn-secondary,
+html.theme-warm body.admin-theme .btn-secondary {
     background: #faf6f0;
 }
 
-body.admin-theme.theme-warm .btn-secondary:hover {
+body.admin-theme.theme-warm .btn-secondary:hover,
+html.theme-warm body.admin-theme .btn-secondary:hover {
     background: #f6eee4;
 }
 
 body.admin-theme.theme-warm .table-container,
+html.theme-warm body.admin-theme .table-container,
 body.admin-theme.theme-warm .content-section,
+html.theme-warm body.admin-theme .content-section,
 body.admin-theme.theme-warm .modal,
-body.admin-theme.theme-warm .dropdown-menu {
+html.theme-warm body.admin-theme .modal,
+body.admin-theme.theme-warm .dropdown-menu,
+html.theme-warm body.admin-theme .dropdown-menu {
     box-shadow: 0 6px 28px rgba(45, 37, 25, 0.08);
 }
