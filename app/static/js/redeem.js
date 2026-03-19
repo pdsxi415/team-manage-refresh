@@ -29,7 +29,7 @@ function showToast(message, type = 'info') {
     if (type === 'success') icon = 'check-circle';
     if (type === 'error') icon = 'alert-circle';
 
-    toast.innerHTML = `<i data-lucide="${icon}"></i><span>${message}</span>`;
+    toast.innerHTML = `<i data-lucide="${icon}"></i><span>${escapeHtml(message)}</span>`;
     toast.className = `toast ${type} show`;
 
     if (window.lucide) {
@@ -522,7 +522,7 @@ function showWarrantyResult(data) {
                     <div style="display: flex; gap: 0.5rem; align-items: center;">
                         <input type="text" value="${escapeHtml(data.original_code)}" readonly 
                             style="flex: 1; padding: 0.75rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-base); border-radius: 8px; color: var(--text-primary); font-family: monospace; font-size: 1.1rem;">
-                        <button onclick="copyWarrantyCode('${escapeHtml(data.original_code)}')" class="btn btn-secondary" style="white-space: nowrap;">
+                        <button onclick='copyWarrantyCode(${JSON.stringify(String(data.original_code || ''))})' class="btn btn-secondary" style="white-space: nowrap;">
                             <i data-lucide="copy"></i> 复制
                         </button>
                     </div>
@@ -604,7 +604,7 @@ function showWarrantyResult(data) {
                                              <span>${escapeHtml(record.team_name || '未知 Team')}</span>
                                              <span>${teamStatusBadge}</span>
                                              ${(record.has_warranty && record.warranty_valid && record.team_status === 'banned') ? `
-                                             <button onclick="oneClickReplace('${escapeHtml(record.code)}', '${escapeHtml(record.email || currentEmail)}', this)" class="btn btn-xs btn-primary" style="padding: 2px 8px; font-size: 0.75rem; height: auto; min-height: 0;">
+                                             <button onclick='oneClickReplace(${JSON.stringify(String(record.code || ''))}, ${JSON.stringify(String(record.email || currentEmail || ''))}, this)' class="btn btn-xs btn-primary" style="padding: 2px 8px; font-size: 0.75rem; height: auto; min-height: 0;">
                                                  一键换车
                                              </button>
                                              ` : ''}
@@ -634,7 +634,7 @@ function showWarrantyResult(data) {
                                              </div>
                                          </div>
                                          ${(!record.device_code_auth_enabled && record.team_status !== 'banned' && record.team_status !== 'expired') ? `
-                                         <button onclick="enableUserDeviceAuth(${record.team_id}, '${escapeHtml(record.code)}', '${escapeHtml(record.email)}', this)" class="btn btn-xs btn-primary" style="padding: 4px 10px; font-size: 0.75rem; height: auto;">
+                                         <button onclick='enableUserDeviceAuth(${Number(record.team_id)}, ${JSON.stringify(String(record.code || ''))}, ${JSON.stringify(String(record.email || ''))}, this)' class="btn btn-xs btn-primary" style="padding: 4px 10px; font-size: 0.75rem; height: auto;">
                                              一键开启
                                          </button>
                                          ` : ''}
@@ -660,7 +660,7 @@ function showWarrantyResult(data) {
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                     <input type="text" value="${escapeHtml(data.original_code)}" readonly 
                         style="flex: 1; padding: 0.75rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-base); border-radius: 8px; color: var(--text-primary); font-family: monospace; font-size: 1.1rem;">
-                    <button onclick="copyWarrantyCode('${escapeHtml(data.original_code)}')" class="btn btn-secondary" style="white-space: nowrap;">
+                    <button onclick='copyWarrantyCode(${JSON.stringify(String(data.original_code || ''))})' class="btn btn-secondary" style="white-space: nowrap;">
                         <i data-lucide="copy"></i> 复制
                     </button>
                 </div>
@@ -693,12 +693,26 @@ function showWarrantyResult(data) {
 }
 
 // 复制质保兑换码
-function copyWarrantyCode(code) {
-    navigator.clipboard.writeText(code).then(() => {
+async function copyWarrantyCode(code) {
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(code);
+        } else {
+            const textArea = document.createElement('textarea');
+            textArea.value = code;
+            textArea.style.position = 'fixed';
+            textArea.style.opacity = '0';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            const copied = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            if (!copied) throw new Error('copy failed');
+        }
         showToast('兑换码已复制到剪贴板', 'success');
-    }).catch(() => {
+    } catch (_) {
         showToast('复制失败，请手动复制', 'error');
-    });
+    }
 }
 
 // 一键换车

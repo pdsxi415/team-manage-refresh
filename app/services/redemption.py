@@ -225,14 +225,14 @@ class RedemptionService:
                 "error": None
             }
 
-        except Exception as e:
+        except Exception:
             await db_session.rollback()
-            logger.error(f"生成兑换码失败: {e}")
+            logger.exception("生成兑换码失败")
             return {
                 "success": False,
                 "code": None,
                 "message": None,
-                "error": f"生成兑换码失败: {str(e)}"
+                "error": "生成兑换码失败，请稍后重试"
             }
 
     async def generate_code_batch(
@@ -318,15 +318,15 @@ class RedemptionService:
                 "error": None
             }
 
-        except Exception as e:
+        except Exception:
             await db_session.rollback()
-            logger.error(f"批量生成兑换码失败: {e}")
+            logger.exception("批量生成兑换码失败")
             return {
                 "success": False,
                 "codes": [],
                 "total": 0,
                 "message": None,
-                "error": f"批量生成兑换码失败: {str(e)}"
+                "error": "批量生成兑换码失败，请稍后重试"
             }
 
     async def validate_code(
@@ -485,14 +485,14 @@ class RedemptionService:
                 "error": None
             }
 
-        except Exception as e:
-            logger.error(f"验证兑换码失败: {e}")
+        except Exception:
+            logger.exception("验证兑换码失败")
             return {
                 "success": False,
                 "valid": False,
                 "reason": None,
                 "redemption_code": None,
-                "error": f"验证兑换码失败: {str(e)}"
+                "error": "验证兑换码失败，请稍后重试"
             }
 
     async def use_code(
@@ -563,13 +563,13 @@ class RedemptionService:
                 "error": None
             }
 
-        except Exception as e:
+        except Exception:
             await db_session.rollback()
-            logger.error(f"使用兑换码失败: {e}")
+            logger.exception("使用兑换码失败")
             return {
                 "success": False,
                 "message": None,
-                "error": f"使用兑换码失败: {str(e)}"
+                "error": "使用兑换码失败，请稍后重试"
             }
 
     async def get_all_codes(
@@ -665,13 +665,13 @@ class RedemptionService:
                 "error": None
             }
 
-        except Exception as e:
-            logger.error(f"获取所有兑换码失败: {e}")
+        except Exception:
+            logger.exception("获取所有兑换码失败")
             return {
                 "success": False,
                 "codes": [],
                 "total": 0,
-                "error": f"获取所有兑换码失败: {str(e)}"
+                "error": "获取所有兑换码失败，请稍后重试"
             }
 
     async def get_unused_count(
@@ -733,12 +733,12 @@ class RedemptionService:
                 "error": None
             }
 
-        except Exception as e:
-            logger.error(f"查询兑换码失败: {e}")
+        except Exception:
+            logger.exception("查询兑换码失败")
             return {
                 "success": False,
                 "code_info": None,
-                "error": f"查询兑换码失败: {str(e)}"
+                "error": "查询兑换码失败，请稍后重试"
             }
 
     async def get_unused_codes(
@@ -780,13 +780,13 @@ class RedemptionService:
                 "error": None
             }
 
-        except Exception as e:
-            logger.error(f"获取未使用兑换码失败: {e}")
+        except Exception:
+            logger.exception("获取未使用兑换码失败")
             return {
                 "success": False,
                 "codes": [],
                 "total": 0,
-                "error": f"获取未使用兑换码失败: {str(e)}"
+                "error": "获取未使用兑换码失败，请稍后重试"
             }
 
     async def get_all_records(
@@ -849,13 +849,13 @@ class RedemptionService:
                 "error": None
             }
 
-        except Exception as e:
-            logger.error(f"获取所有兑换记录失败: {e}")
+        except Exception:
+            logger.exception("获取所有兑换记录失败")
             return {
                 "success": False,
                 "records": [],
                 "total": 0,
-                "error": f"获取所有兑换记录失败: {str(e)}"
+                "error": "获取所有兑换记录失败，请稍后重试"
             }
 
     async def delete_code(
@@ -898,13 +898,13 @@ class RedemptionService:
                 "error": None
             }
 
-        except Exception as e:
+        except Exception:
             await db_session.rollback()
-            logger.error(f"删除兑换码失败: {e}")
+            logger.exception("删除兑换码失败")
             return {
                 "success": False,
                 "message": None,
-                "error": f"删除兑换码失败: {str(e)}"
+                "error": "删除兑换码失败，请稍后重试"
             }
 
     async def update_code(
@@ -987,12 +987,10 @@ class RedemptionService:
                 "message": message
             }
 
-        except Exception as e:
+        except Exception:
             await db_session.rollback()
-            logger.error(f"撤回记录失败: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return {"success": False, "error": f"撤回失败: {str(e)}"}
+            logger.exception("撤回记录失败")
+            return {"success": False, "error": "撤回失败，请稍后重试"}
 
     async def bulk_update_codes(
         self,
@@ -1039,13 +1037,13 @@ class RedemptionService:
                 "error": None
             }
 
-        except Exception as e:
+        except Exception:
             await db_session.rollback()
-            logger.error(f"批量更新兑换码失败: {e}")
+            logger.exception("批量更新兑换码失败")
             return {
                 "success": False,
                 "message": None,
-                "error": f"批量更新失败: {str(e)}"
+                "error": "批量更新失败，请稍后重试"
             }
 
     async def get_stats(

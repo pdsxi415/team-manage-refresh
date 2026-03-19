@@ -104,10 +104,10 @@ async def check_warranty(
         
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500,
-            detail=f"查询质保状态失败: {str(e)}"
+            detail="查询质保状态失败，请稍后重试"
         )
 
 
@@ -160,8 +160,8 @@ async def enable_device_auth(
         
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=500,
-            detail=f"开启失败: {str(e)}"
+            detail="开启失败，请稍后重试"
         )
