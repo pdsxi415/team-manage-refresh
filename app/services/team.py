@@ -259,9 +259,12 @@ class TeamService:
                 )
                 if refresh_result["success"]:
                     new_at = refresh_result["access_token"]
+                    new_id_token = refresh_result.get("id_token")
                     new_rt = refresh_result.get("refresh_token")
                     logger.info(f"Team {team.id} 通过 refresh_token 成功刷新 AT")
                     team.access_token_encrypted = encryption_service.encrypt_token(new_at)
+                    if new_id_token:
+                        team.id_token_encrypted = encryption_service.encrypt_token(new_id_token)
                     if new_rt:
                         team.refresh_token_encrypted = encryption_service.encrypt_token(new_rt)
                     # 成功刷新，重置错误状态
@@ -281,8 +284,11 @@ class TeamService:
             if refresh_result["success"]:
                 new_at = refresh_result["access_token"]
                 new_st = refresh_result.get("session_token")
+                new_id_token = refresh_result.get("id_token")
                 logger.info(f"Team {team.id} 通过 session_token 成功刷新 AT")
                 team.access_token_encrypted = encryption_service.encrypt_token(new_at)
+                if new_id_token:
+                    team.id_token_encrypted = encryption_service.encrypt_token(new_id_token)
 
                 # 如果返回了新的 session_token,予以更新
                 if new_st and new_st != session_token:
@@ -364,6 +370,7 @@ class TeamService:
         db_session: AsyncSession,
         email: Optional[str] = None,
         account_id: Optional[str] = None,
+        id_token: Optional[str] = None,
         refresh_token: Optional[str] = None,
         session_token: Optional[str] = None,
         client_id: Optional[str] = None,
@@ -413,6 +420,8 @@ class TeamService:
                     )
                     if refresh_result["success"]:
                         access_token = refresh_result["access_token"]
+                        if refresh_result.get("id_token"):
+                            id_token = refresh_result["id_token"]
                         # 导入时如果 ST 变了,更新变量以便后续保存
                         if refresh_result.get("session_token"):
                             session_token = refresh_result["session_token"]
@@ -426,6 +435,8 @@ class TeamService:
                     )
                     if refresh_result["success"]:
                         access_token = refresh_result["access_token"]
+                        if refresh_result.get("id_token"):
+                            id_token = refresh_result["id_token"]
                         # RT 刷新可能会返回新的 RT
                         if refresh_result.get("refresh_token"):
                             refresh_token = refresh_result["refresh_token"]
@@ -443,8 +454,9 @@ class TeamService:
 
             # 2. 如果没有提供邮箱,从 Token 中提取; 如果提供了,则校验是否匹配 (安全兜底)
             token_email = self.jwt_parser.extract_email(access_token)
+            id_token_email = self.jwt_parser.extract_email(id_token) if id_token else None
             if not email:
-                email = token_email
+                email = token_email or id_token_email
                 if not email:
                     return {
                         "success": False,
@@ -606,6 +618,7 @@ class TeamService:
 
                 # 加密 AT Token
                 encrypted_token = encryption_service.encrypt_token(access_token)
+                encrypted_id_token = encryption_service.encrypt_token(id_token) if id_token else None
                 encrypted_rt = encryption_service.encrypt_token(refresh_token) if refresh_token else None
                 encrypted_st = encryption_service.encrypt_token(session_token) if session_token else None
 
@@ -613,6 +626,7 @@ class TeamService:
                 team = Team(
                     email=email,
                     access_token_encrypted=encrypted_token,
+                    id_token_encrypted=encrypted_id_token,
                     refresh_token_encrypted=encrypted_rt,
                     session_token_encrypted=encrypted_st,
                     client_id=client_id,
@@ -698,6 +712,7 @@ class TeamService:
         team_id: int,
         db_session: AsyncSession,
         access_token: Optional[str] = None,
+        id_token: Optional[str] = None,
         refresh_token: Optional[str] = None,
         session_token: Optional[str] = None,
         client_id: Optional[str] = None,
@@ -758,6 +773,10 @@ class TeamService:
             if access_token is not None and access_token.strip():
                 team.access_token_encrypted = encryption_service.encrypt_token(access_token.strip())
 
+            if id_token is not None:
+                id_token = id_token.strip()
+                team.id_token_encrypted = encryption_service.encrypt_token(id_token) if id_token else None
+
             if refresh_token is not None:
                 refresh_token = refresh_token.strip()
                 team.refresh_token_encrypted = encryption_service.encrypt_token(refresh_token) if refresh_token else None
@@ -810,10 +829,28 @@ class TeamService:
 
             # 解密 Token
             access_token = ""
+            id_token = ""
+            refresh_token = ""
+            session_token = ""
             try:
                 access_token = encryption_service.decrypt_token(team.access_token_encrypted)
             except Exception as e:
-                logger.error(f"解密 Token 失败: {e}")
+                logger.error(f"解密 Team {team_id} access_token 失败: {e}")
+            try:
+                if team.id_token_encrypted:
+                    id_token = encryption_service.decrypt_token(team.id_token_encrypted)
+            except Exception as e:
+                logger.error(f"解密 Team {team_id} id_token 失败: {e}")
+            try:
+                if team.refresh_token_encrypted:
+                    refresh_token = encryption_service.decrypt_token(team.refresh_token_encrypted)
+            except Exception as e:
+                logger.error(f"解密 Team {team_id} refresh_token 失败: {e}")
+            try:
+                if team.session_token_encrypted:
+                    session_token = encryption_service.decrypt_token(team.session_token_encrypted)
+            except Exception as e:
+                logger.error(f"解密 Team {team_id} session_token 失败: {e}")
 
             return {
                 "success": True,
@@ -823,8 +860,9 @@ class TeamService:
                     "account_id": team.account_id,
                     "max_members": team.max_members,
                     "access_token": access_token,
-                    "refresh_token": encryption_service.decrypt_token(team.refresh_token_encrypted) if team.refresh_token_encrypted else "",
-                    "session_token": encryption_service.decrypt_token(team.session_token_encrypted) if team.session_token_encrypted else "",
+                    "id_token": id_token,
+                    "refresh_token": refresh_token,
+                    "session_token": session_token,
                     "client_id": team.client_id or "",
                     "team_name": team.team_name,
                     "status": team.status,
@@ -904,6 +942,7 @@ class TeamService:
                     db_session=db_session,
                     email=data.get("email"),
                     account_id=data.get("account_id"),
+                    id_token=data.get("id_token"),
                     refresh_token=data.get("refresh_token"),
                     session_token=data.get("session_token"),
                     client_id=data.get("client_id"),
@@ -991,6 +1030,7 @@ class TeamService:
 
                 normalized_items.append({
                     "access_token": access_token,
+                    "id_token": item.get("id_token"),
                     "refresh_token": refresh_token,
                     "session_token": session_token,
                     "client_id": item.get("client_id"),
@@ -1013,6 +1053,7 @@ class TeamService:
                     db_session=db_session,
                     email=data.get("email"),
                     account_id=data.get("account_id"),
+                    id_token=data.get("id_token"),
                     refresh_token=data.get("refresh_token"),
                     session_token=data.get("session_token"),
                     client_id=data.get("client_id"),
@@ -2076,17 +2117,29 @@ class TeamService:
 
             # 解密 Token
             access_token = ""
+            id_token = ""
             refresh_token = ""
             session_token = ""
             try:
                 if team.access_token_encrypted:
                     access_token = encryption_service.decrypt_token(team.access_token_encrypted)
+            except Exception as e:
+                logger.error(f"解密 Team {team_id} access_token 失败: {e}")
+            try:
+                if team.id_token_encrypted:
+                    id_token = encryption_service.decrypt_token(team.id_token_encrypted)
+            except Exception as e:
+                logger.error(f"解密 Team {team_id} id_token 失败: {e}")
+            try:
                 if team.refresh_token_encrypted:
                     refresh_token = encryption_service.decrypt_token(team.refresh_token_encrypted)
+            except Exception as e:
+                logger.error(f"解密 Team {team_id} refresh_token 失败: {e}")
+            try:
                 if team.session_token_encrypted:
                     session_token = encryption_service.decrypt_token(team.session_token_encrypted)
             except Exception as e:
-                logger.error(f"解密 Team {team_id} Token 失败: {e}")
+                logger.error(f"解密 Team {team_id} session_token 失败: {e}")
 
             # 构建返回数据
             team_data = {
@@ -2094,6 +2147,7 @@ class TeamService:
                 "email": team.email,
                 "account_id": team.account_id,
                 "access_token": access_token,
+                "id_token": id_token,
                 "refresh_token": refresh_token,
                 "session_token": session_token,
                 "client_id": team.client_id or "",
@@ -2104,6 +2158,7 @@ class TeamService:
                 "current_members": team.current_members,
                 "max_members": team.max_members,
                 "status": team.status,
+                "account_role": team.account_role,
                 "device_code_auth_enabled": team.device_code_auth_enabled,
                 "last_sync": team.last_sync.isoformat() if team.last_sync else None,
                 "created_at": team.created_at.isoformat() if team.created_at else None

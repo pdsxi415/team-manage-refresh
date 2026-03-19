@@ -121,24 +121,58 @@ async function initThemeSwitcher() {
 
 
 // Toast 提示函数
-function showToast(message, type = 'info') {
+function showToast(message, type = 'info', options = {}) {
     const toast = document.getElementById('toast');
     if (!toast) return;
 
-    let icon = 'info';
-    if (type === 'success') icon = 'check-circle';
-    if (type === 'error') icon = 'alert-circle';
+    const iconMap = {
+        success: 'check-circle',
+        error: 'alert-circle',
+        warning: 'alert-triangle',
+        info: 'info'
+    };
+    const titleMap = {
+        success: '操作成功',
+        error: '操作失败',
+        warning: '请注意',
+        info: '提示'
+    };
+    const durationMap = {
+        success: 4200,
+        error: 5200,
+        warning: 4200,
+        info: 3000
+    };
 
-    toast.innerHTML = `<i data-lucide="${icon}"></i><span>${escapeHtml(message)}</span>`;
-    toast.className = `toast ${type} show`;
+    const toastType = ['success', 'error', 'warning', 'info'].includes(type) ? type : 'info';
+    const icon = iconMap[toastType];
+    const title = escapeHtml(String(options.title || titleMap[toastType] || ''));
+    const detail = escapeHtml(String(message || ''));
+    const duration = Number.isFinite(options.duration) ? Number(options.duration) : (durationMap[toastType] || 3000);
+
+    if (window.__toastTimer) {
+        window.clearTimeout(window.__toastTimer);
+        window.__toastTimer = null;
+    }
+
+    toast.innerHTML = `
+        <div class="toast-icon-wrap">
+            <i data-lucide="${icon}"></i>
+        </div>
+        <div class="toast-content">
+            <div class="toast-title">${title}</div>
+            <div class="toast-message">${detail}</div>
+        </div>
+    `;
+    toast.className = `toast ${toastType} show`;
 
     if (window.lucide) {
         lucide.createIcons();
     }
 
-    setTimeout(() => {
+    window.__toastTimer = window.setTimeout(() => {
         toast.classList.remove('show');
-    }, 3000);
+    }, Math.max(duration, 1200));
 }
 
 // 日期格式化函数
@@ -575,6 +609,7 @@ function buildOAuthJsonTemplate(parsedData) {
     const refreshToken = parsedData.refresh_token || '';
     const raw = parsedData.raw || {};
     const idToken = raw.id_token || parsedData.id_token || '';
+    const clientId = raw.client_id || parsedData.client_id || '';
 
     const accessPayload = decodeJwtPayload(accessToken) || {};
     const idPayload = decodeJwtPayload(idToken) || {};
@@ -590,6 +625,7 @@ function buildOAuthJsonTemplate(parsedData) {
     return {
         access_token: accessToken,
         account_id: accountId,
+        client_id: clientId,
         email,
         expired,
         id_token: idToken,
@@ -629,9 +665,13 @@ async function parseOAuthCallbackAndFill() {
 
     try {
         const data = await parseOAuthCallbackData(true);
-        if (form.accessToken && data.access_token) form.accessToken.value = data.access_token;
-        if (form.refreshToken && data.refresh_token) form.refreshToken.value = data.refresh_token;
-        if (form.clientId && data.client_id) form.clientId.value = data.client_id;
+        const normalized = buildOAuthJsonTemplate(data);
+        if (form.accessToken) form.accessToken.value = normalized.access_token || '';
+        if (form.idToken) form.idToken.value = normalized.id_token || '';
+        if (form.refreshToken) form.refreshToken.value = normalized.refresh_token || '';
+        if (form.clientId) form.clientId.value = data.client_id || normalized.client_id || '';
+        if (form.email) form.email.value = normalized.email || '';
+        if (form.accountId) form.accountId.value = normalized.account_id || '';
 
         showToast('已自动填充 Token 信息，请确认后导入', 'success');
     } catch (error) {
@@ -644,6 +684,7 @@ async function handleSingleImport(event) {
     event.preventDefault();
     const form = event.target;
     const accessToken = form.accessToken.value.trim();
+    const idToken = form.idToken ? form.idToken.value.trim() : null;
     const refreshToken = form.refreshToken ? form.refreshToken.value.trim() : null;
     const sessionToken = form.sessionToken ? form.sessionToken.value.trim() : null;
     const clientId = form.clientId ? form.clientId.value.trim() : null;
@@ -660,6 +701,7 @@ async function handleSingleImport(event) {
             body: JSON.stringify({
                 import_type: 'single',
                 access_token: accessToken,
+                id_token: idToken || null,
                 refresh_token: refreshToken || null,
                 session_token: sessionToken || null,
                 client_id: clientId || null,
