@@ -278,8 +278,20 @@ function syncResponsiveSidebarMount() {
     }
 }
 
+function mountFloatingDropdownsToBody() {
+    document.querySelectorAll('.dropdown-menu-floating').forEach((menu) => {
+        const wrapper = menu.closest('.dropdown-wrapper');
+        if (!wrapper || menu.parentElement === document.body) return;
+
+        menu._dropdownWrapper = wrapper;
+        document.body.appendChild(menu);
+    });
+}
+
 // 页面加载完成后执行
 document.addEventListener('DOMContentLoaded', function () {
+    mountFloatingDropdownsToBody();
+
     // 检查认证状态
     checkAuthStatus();
 

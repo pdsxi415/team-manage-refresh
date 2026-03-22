@@ -1051,7 +1051,7 @@
     function positionFloatingDropdown(menu) {
         if (!menu || !menu.classList.contains('dropdown-menu-floating')) return;
 
-        const wrapper = menu.closest('.dropdown-wrapper');
+        const wrapper = menu._dropdownWrapper || menu.closest('.dropdown-wrapper');
         if (!wrapper) return;
 
         const wrapperRect = wrapper.getBoundingClientRect();
