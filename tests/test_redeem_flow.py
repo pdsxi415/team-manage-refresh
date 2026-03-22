@@ -596,6 +596,56 @@ class RedeemFlowServiceTests(unittest.IsolatedAsyncioTestCase):
             ).scalars().all()
             self.assertEqual(len(stored_records), 1)
 
+    async def test_warranty_reuse_allows_original_email_after_orphan_cleanup(self):
+        async with self.session_factory() as session:
+            team = Team(
+                id=51,
+                email="owner-51@example.com",
+                access_token_encrypted="token-51",
+                account_id="acct-51",
+                team_name="Ghost Team",
+                current_members=2,
+                max_members=6,
+                status="active",
+                pool_type="normal",
+            )
+            code = RedemptionCode(
+                code="WARRANTY-GHOST-001",
+                status="used",
+                has_warranty=True,
+                warranty_days=30,
+                used_at=get_now() - timedelta(days=2),
+                warranty_expires_at=get_now() + timedelta(days=28),
+            )
+            record = RedemptionRecord(
+                email="buyer@example.com",
+                code="WARRANTY-GHOST-001",
+                team_id=51,
+                account_id="acct-51",
+            )
+            session.add_all([team, code, record])
+            await session.commit()
+
+            service = WarrantyService()
+            service.team_service = StubTeamService(sync_results={51: [{"success": True, "member_emails": []}]})
+
+            result = await service.validate_warranty_reuse(
+                session,
+                "WARRANTY-GHOST-001",
+                "buyer@example.com",
+            )
+
+            self.assertTrue(result["success"])
+            self.assertTrue(result["can_reuse"])
+            self.assertIn("已自动修复", result["reason"])
+
+            stored_records = (
+                await session.execute(
+                    select(RedemptionRecord).where(RedemptionRecord.code == "WARRANTY-GHOST-001")
+                )
+            ).scalars().all()
+            self.assertEqual(stored_records, [])
+
     async def test_seat_rolls_back_after_full_error(self):
         await self._seed_basic_data()
         service = RedeemFlowService()

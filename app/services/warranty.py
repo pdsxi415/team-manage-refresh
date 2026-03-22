@@ -413,6 +413,8 @@ class WarrantyService:
             stmt = select(RedemptionRecord).where(RedemptionRecord.code == code)
             result = await db_session.execute(stmt)
             all_records_for_code = result.scalars().all()
+            had_matching_history = any(r.email == email for r in all_records_for_code)
+            cleaned_orphan_for_email = False
             
             for record in all_records_for_code:
                 stmt = select(Team).where(Team.id == record.team_id)
@@ -431,6 +433,8 @@ class WarrantyService:
                         if record.email.lower() not in member_emails:
                             logger.warning(f"自愈逻辑: 发现孤儿记录 (Email: {record.email}, Team: {team.id}), 但同步结果中不包含该成员。正在清理记录。")
                             # 删除该孤儿记录
+                            if record.email == email:
+                                cleaned_orphan_for_email = True
                             await db_session.delete(record)
                             if not db_session.in_transaction():
                                 await db_session.commit()
@@ -455,10 +459,22 @@ class WarrantyService:
                                 "error": None
                             }
 
-            # 5. 查找当前用户使用该兑换码的记录 (用于后续逻辑判断)
+            # 5. 刷新记录列表，避免继续使用已删除的孤儿记录快照
+            stmt = select(RedemptionRecord).where(RedemptionRecord.code == code)
+            result = await db_session.execute(stmt)
+            all_records_for_code = result.scalars().all()
+
+            # 6. 查找当前用户使用该兑换码的记录 (用于后续逻辑判断)
             records = [r for r in all_records_for_code if r.email == email]
             
             if not records:
+                if cleaned_orphan_for_email or had_matching_history:
+                    return {
+                        "success": True,
+                        "can_reuse": True,
+                        "reason": "检测到历史记录同步异常，已自动修复，可重新兑换",
+                        "error": None
+                    }
                 return {
                     "success": True,
                     "can_reuse": False,
@@ -466,7 +482,7 @@ class WarrantyService:
                     "error": None
                 }
 
-            # 5. 检查用户当前是否已在有效的 Team 中
+            # 7. 检查用户当前是否已在有效的 Team 中
             # 逻辑：如果最近一次加入的 Team 仍然有效（active/full 且未过期），则不允许重复使用
             for record in records:
                 stmt = select(Team).where(Team.id == record.team_id)
@@ -484,7 +500,7 @@ class WarrantyService:
                             "error": None
                         }
 
-            # 6. 检查是否有过被封的记录
+            # 8. 检查是否有过被封的记录
             has_banned_team = False
             for record in records:
                 stmt = select(Team).where(Team.id == record.team_id)
