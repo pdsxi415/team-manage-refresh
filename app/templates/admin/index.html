@@ -139,6 +139,24 @@
         max-width: 100%;
     }
 
+    .team-toolbar #batchActions.batch-actions-group.viewport-floating {
+        position: fixed;
+        left: 50%;
+        top: 0;
+        transform: translateX(-50%);
+        width: min(1080px, calc(100vw - 1.5rem));
+        max-width: min(1080px, calc(100vw - 1.5rem));
+        padding: 0.75rem 1rem;
+        background: color-mix(in srgb, var(--bg-surface) 94%, #0f172a 6%);
+        border: 1px solid var(--primary);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.2);
+        backdrop-filter: blur(10px);
+        z-index: 980;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+
     .team-toolbar .batch-actions-group .selected-count {
         white-space: nowrap;
     }
@@ -406,7 +424,7 @@
     <table class="data-table">
         <thead>
             <tr>
-                <th style="width: 40px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)">
+                <th style="width: 40px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked, this)">
                 </th>
                 <th>{% if active_page == "welfare" %}编号{% else %}ID{% endif %}</th>
                 <th>邮箱</th>
@@ -423,7 +441,7 @@
         <tbody>
             {% for team in teams %}
             <tr>
-                <td><input type="checkbox" class="team-checkbox" value="{{ team.id }}" onchange="updateSelectedCount()">
+                <td><input type="checkbox" class="team-checkbox" value="{{ team.id }}" onchange="updateSelectedCount(this)">
                 </td>
                 <td><span class="text-muted">{% if active_page == "welfare" %}{{ ((pagination.current_page - 1) * pagination.per_page) + loop.index }}{% else %}{{ team.id }}{% endif %}</span></td>
                 <td>
@@ -775,11 +793,17 @@
 
         // 绑定复选框事件（避免仅依赖内联 onchange）
         document.getElementById('selectAll')?.addEventListener('change', (e) => {
-            toggleSelectAll(Boolean(e.target && e.target.checked));
+            toggleSelectAll(Boolean(e.target && e.target.checked), e.target);
         });
         document.querySelectorAll('.team-checkbox').forEach(cb => {
-            cb.addEventListener('change', updateSelectedCount);
+            cb.addEventListener('change', (e) => updateSelectedCount(e.target));
         });
+
+        const batchActions = document.getElementById('batchActions');
+        if (batchActions) {
+            window.addEventListener('scroll', () => updateBatchActionsFloatingPosition(), true);
+            window.addEventListener('resize', () => updateBatchActionsFloatingPosition());
+        }
 
         // 绑定批量操作按钮（避免依赖内联 onclick，兼容更严格的 CSP）
         document.getElementById('btnBatchRefresh')?.addEventListener('click', handleBatchRefresh);
@@ -787,6 +811,41 @@
         document.getElementById('btnBatchPushCliproxyapi')?.addEventListener('click', handleBatchPushCliproxyapi);
         document.getElementById('btnBatchDelete')?.addEventListener('click', handleBatchDelete);
     });
+
+    function updateBatchActionsFloatingPosition(anchorElement = null) {
+        const batchActions = document.getElementById('batchActions');
+        if (!batchActions || batchActions.style.display === 'none') {
+            if (batchActions) {
+                batchActions.classList.remove('viewport-floating');
+                batchActions.style.top = '';
+                batchActions._floatingAnchor = null;
+            }
+            return;
+        }
+
+        if (anchorElement && typeof anchorElement.getBoundingClientRect === 'function') {
+            batchActions._floatingAnchor = anchorElement;
+        }
+
+        const selectedRowCheckbox = document.querySelector('.team-checkbox:checked');
+        const fallbackAnchor = document.getElementById('selectAll');
+        const anchorNode = anchorElement || batchActions._floatingAnchor || selectedRowCheckbox || fallbackAnchor;
+        const anchorRect = anchorNode?.getBoundingClientRect();
+
+        batchActions.classList.add('viewport-floating');
+
+        const viewportTopPadding = 12;
+        const viewportBottomPadding = 14;
+        const expectedHeight = batchActions.offsetHeight || 58;
+        const preferredTop = anchorRect
+            ? anchorRect.bottom + 10
+            : (window.innerHeight - expectedHeight - viewportBottomPadding);
+        const maxTop = Math.max(viewportTopPadding, window.innerHeight - expectedHeight - viewportBottomPadding);
+        const top = Math.min(Math.max(preferredTop, viewportTopPadding), maxTop);
+
+        batchActions.style.top = `${top}px`;
+    }
+
 
     async function enableDeviceAuth(teamId) {
         if (!confirm('确定要为该 Team 开启设备代码身份验证吗?')) {
@@ -811,6 +870,7 @@
             showToast('网络错误', 'error');
         }
     }
+
 
     async function pushTeamToCliproxyapi(teamId, email = '') {
         const targetLabel = email ? `"${email}"` : `ID=${teamId}`;
@@ -1211,22 +1271,22 @@
     }
 
     function toggleDropdown(id, triggerEl = null) {
-    const el = document.getElementById(id);
-    if (!el) return;
+        const el = document.getElementById(id);
+        if (!el) return;
 
-    const shouldShow = !el.classList.contains('show');
-    closeFloatingDropdowns();
+        const shouldShow = !el.classList.contains('show');
+        closeFloatingDropdowns();
 
-    if (shouldShow) {
-        el.classList.add('show');
-        positionFloatingDropdown(el, triggerEl);
-        requestAnimationFrame(() => positionFloatingDropdown(el));
-        // 加上 typeof 判断，防止 setDropdownSectionState 不存在时报错
-        if (typeof setDropdownSectionState === 'function') {
-            setDropdownSectionState(el, true);
+        if (shouldShow) {
+            el.classList.add('show');
+            positionFloatingDropdown(el, triggerEl);
+            requestAnimationFrame(() => positionFloatingDropdown(el));
+            // 加上 typeof 判断，防止 setDropdownSectionState 不存在时报错
+            if (typeof setDropdownSectionState === 'function') {
+                setDropdownSectionState(el, true);
+            }
         }
     }
-}
 
     window.addEventListener('resize', () => {
         document.querySelectorAll('.dropdown-menu.show.dropdown-menu-floating').forEach((menu) => positionFloatingDropdown(menu));
@@ -1257,28 +1317,36 @@
         window.location.href = url.toString();
     }
 
-    function toggleSelectAll(checked) {
+    function toggleSelectAll(checked, anchorElement = null) {
         document.querySelectorAll('.team-checkbox').forEach(cb => {
             cb.checked = checked;
         });
-        updateSelectedCount();
+        updateSelectedCount(anchorElement);
     }
 
-    function updateSelectedCount() {
+    function updateSelectedCount(anchorElement = null) {
         const checkboxes = document.querySelectorAll('.team-checkbox');
         const selectedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
         const totalCount = checkboxes.length;
 
         const batchActions = document.getElementById('batchActions');
+        if (!batchActions) return;
+
         const countSpan = batchActions.querySelector('.selected-count');
         const selectAll = document.getElementById('selectAll');
 
         if (selectedCount > 0) {
             batchActions.style.display = 'flex';
             batchActions.style.alignItems = 'center';
-            countSpan.innerText = `已选 ${selectedCount} 项`;
+            if (countSpan) {
+                countSpan.innerText = `已选 ${selectedCount} 项`;
+            }
+            updateBatchActionsFloatingPosition(anchorElement);
         } else {
             batchActions.style.display = 'none';
+            batchActions.classList.remove('viewport-floating');
+            batchActions.style.top = '';
+            batchActions._floatingAnchor = null;
         }
 
         // Update Select All state
