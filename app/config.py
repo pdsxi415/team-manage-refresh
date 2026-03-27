@@ -2,6 +2,9 @@
 应用配置模块
 使用 Pydantic Settings 管理配置
 """
+from urllib.parse import urlsplit, urlunsplit
+
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
@@ -17,7 +20,7 @@ class Settings(BaseSettings):
     app_name: str = "GPT Team 管理系统"
     app_version: str = "0.1.0"
     app_host: str = "0.0.0.0"
-    app_port: int = 8008
+    app_port: int = Field(8008, validation_alias=AliasChoices("APP_PORT", "PORT"))
     debug: bool = True
 
     # 数据库配置
@@ -51,3 +54,47 @@ class Settings(BaseSettings):
 
 # 创建全局配置实例
 settings = Settings()
+
+
+def normalize_database_url(database_url: str) -> str:
+    """规范化数据库连接串，兼容 Render/Neon 常见写法。"""
+    raw_url = str(database_url or "").strip()
+    if not raw_url:
+        return raw_url
+
+    if raw_url.startswith("postgresql+asyncpg://") or raw_url.startswith("sqlite+aiosqlite://"):
+        return raw_url
+
+    if raw_url.startswith("postgresql://"):
+        return raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    if raw_url.startswith("postgres://"):
+        return raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
+
+    return raw_url
+
+
+def is_sqlite_url(database_url: str) -> bool:
+    normalized = normalize_database_url(database_url)
+    return normalized.startswith("sqlite")
+
+
+def get_sqlite_file_path(database_url: str) -> Path | None:
+    """获取 SQLite 数据库文件路径；内存库返回 None。"""
+    normalized = normalize_database_url(database_url)
+    if not is_sqlite_url(normalized):
+        return None
+
+    parsed = urlsplit(normalized)
+    db_path = parsed.path or ""
+
+    if db_path in {"/:memory:", ":memory:"}:
+        return None
+
+    if normalized.startswith("sqlite+aiosqlite:///./"):
+        return (BASE_DIR / db_path.removeprefix("/./")).resolve()
+
+    if normalized.startswith("sqlite+aiosqlite:///") and not normalized.startswith("sqlite+aiosqlite:////"):
+        return (BASE_DIR / db_path.lstrip("/")).resolve()
+
+    return Path(urlunsplit(("", "", db_path, "", ""))).resolve()

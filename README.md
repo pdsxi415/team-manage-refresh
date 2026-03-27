@@ -129,7 +129,7 @@ git pull
 
 - **后端框架**: FastAPI 0.109+
 - **Web 服务器**: Uvicorn
-- **数据库**: SQLite + SQLAlchemy 2.0 + aiosqlite
+- **数据库**: SQLite / PostgreSQL(Neon) + SQLAlchemy 2.0 + aiosqlite/asyncpg
 - **模板引擎**: Jinja2
 - **HTTP 客户端**: curl-cffi（模拟浏览器指纹，绕过 Cloudflare 防护）
 - **调度任务**: APScheduler（Token 预刷新、Team 周期同步）
@@ -189,7 +189,7 @@ APP_HOST=0.0.0.0
 APP_PORT=8008
 DEBUG=True
 
-# 数据库配置（默认使用 SQLite）
+# 数据库配置（默认使用 SQLite，本项目也支持 Neon/PostgreSQL）
 DATABASE_URL=sqlite+aiosqlite:///team_manage.db
 
 # 安全配置（生产环境请修改）
@@ -212,6 +212,8 @@ JWT_VERIFY_SIGNATURE=False
 ```bash
 python init_db.py
 ```
+
+如果使用 Render + Neon，也可以直接在 Render 启动应用，项目会在启动时自动建表并补齐默认系统设置，无需单独挂载本地数据库文件。
 
 ### 6. 启动应用
 
@@ -327,7 +329,31 @@ team-manage/
 
 ### 数据库配置
 
-默认使用 SQLite 数据库，数据库文件为 `team_manage.db`。如需使用其他数据库，请修改 `DATABASE_URL`。
+默认使用 SQLite 数据库，数据库文件为 `team_manage.db`。如需使用 Neon/PostgreSQL，可直接把 `DATABASE_URL` 设置为普通 Postgres 连接串，例如：
+
+```env
+DATABASE_URL=postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require&channel_binding=require
+```
+
+应用会自动转换为 SQLAlchemy 异步驱动所需的连接格式。
+
+## Render + Neon 部署说明
+
+1. 在 Neon 创建数据库，拿到连接串。
+2. 在 Render 创建 Web Service，可直接使用本仓库根目录的 `render.yaml`。
+3. 在 Render 环境变量中设置：
+   - `DATABASE_URL` = 你的 Neon 连接串
+   - `SECRET_KEY` = 一段随机长字符串
+   - `ADMIN_PASSWORD` = 后台管理员初始密码
+   - `DEBUG` = `False`
+4. 首次启动时应用会自动：
+   - 建表
+   - 补齐默认系统设置
+   - 初始化管理员密码
+
+说明：
+- Render 容器重启后本地文件会丢失，但只要使用 Neon，这个项目的数据不会丢。
+- 旧的 `app/db_migrations.py` 是 SQLite 专用迁移逻辑；部署到 Neon 时会自动跳过，不会影响启动。
 
 ### 代理配置
 

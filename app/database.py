@@ -1,22 +1,33 @@
 """
 数据库连接模块
-SQLite 异步连接配置和会话管理
+统一管理 SQLite / PostgreSQL 异步连接配置和会话
 """
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
-from app.config import settings
+from app.config import settings, is_sqlite_url, normalize_database_url
+
+database_url = normalize_database_url(settings.database_url)
+
+engine_kwargs = {
+    "echo": settings.database_echo,
+    "future": True,
+    "pool_pre_ping": True,
+}
+
+if is_sqlite_url(database_url):
+    engine_kwargs["connect_args"] = {"timeout": 60}
+else:
+    engine_kwargs.update({
+        "pool_size": 20,
+        "max_overflow": 40,
+        "pool_recycle": 1800,
+    })
 
 # 创建异步引擎
 engine = create_async_engine(
-    settings.database_url,
-    echo=settings.database_echo,  # 控制是否打印 SQL
-    future=True,
-    connect_args={"timeout": 60},  # 增大连接超时
-    pool_size=50,                  # 基准连接池大小
-    max_overflow=100,              # 最大允许溢出的连接数
-    pool_recycle=3600,             # 每小时回收连接防止失效
-    pool_pre_ping=True             # 每次使用连接前进行活跃性检测
+    database_url,
+    **engine_kwargs
 )
 
 # 创建异步会话工厂
@@ -50,7 +61,8 @@ async def init_db():
     创建所有表
     """
     async with engine.begin() as conn:
-        await conn.execute(text("PRAGMA journal_mode=WAL"))
+        if is_sqlite_url(database_url):
+            await conn.execute(text("PRAGMA journal_mode=WAL"))
         await conn.run_sync(Base.metadata.create_all)
 
 

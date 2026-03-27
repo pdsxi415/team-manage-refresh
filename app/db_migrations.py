@@ -4,8 +4,8 @@
 """
 import logging
 import sqlite3
-from pathlib import Path
-from datetime import datetime
+
+from app.config import get_sqlite_file_path, is_sqlite_url, normalize_database_url
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 def get_db_path():
     """获取数据库文件路径"""
     from app.config import settings
-    db_file = settings.database_url.split("///")[-1]
-    return Path(db_file)
+    return get_sqlite_file_path(settings.database_url)
 
 
 def column_exists(cursor, table_name, column_name):
@@ -38,8 +37,19 @@ def run_auto_migration():
     自动运行数据库迁移
     检测缺失的列并自动添加
     """
+    from app.config import settings
+
+    database_url = normalize_database_url(settings.database_url)
+    if not is_sqlite_url(database_url):
+        logger.info("当前数据库不是 SQLite，跳过 sqlite 专用自动迁移")
+        return
+
     db_path = get_db_path()
-    
+
+    if not db_path:
+        logger.info("当前 SQLite 数据库为内存模式，跳过迁移")
+        return
+
     if not db_path.exists():
         logger.info("数据库文件不存在，跳过迁移")
         return

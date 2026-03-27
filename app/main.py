@@ -21,8 +21,9 @@ from apscheduler.triggers.interval import IntervalTrigger
 from contextlib import asynccontextmanager
 # 导入路由
 from app.routes import redeem, auth, admin, api, user, warranty
-from app.config import settings
+from app.config import settings, get_sqlite_file_path, is_sqlite_url, normalize_database_url
 from app.database import init_db, close_db, AsyncSessionLocal
+from app.bootstrap import ensure_default_settings
 from app.services.auth import auth_service
 from app.services.team import team_service
 
@@ -232,8 +233,11 @@ async def lifespan(app: FastAPI):
     logger.info("系统正在启动，正在初始化数据库...")
     try:
         # 0. 确保数据库目录存在
-        db_file = settings.database_url.split("///")[-1]
-        Path(db_file).parent.mkdir(parents=True, exist_ok=True)
+        normalized_database_url = normalize_database_url(settings.database_url)
+        if is_sqlite_url(normalized_database_url):
+            db_file = get_sqlite_file_path(normalized_database_url)
+            if db_file:
+                db_file.parent.mkdir(parents=True, exist_ok=True)
         
         # 1. 创建数据库表
         await init_db()
@@ -244,6 +248,7 @@ async def lifespan(app: FastAPI):
         
         # 3. 初始化管理员密码（如果不存在）
         async with AsyncSessionLocal() as session:
+            await ensure_default_settings(session)
             await auth_service.initialize_admin_password(session)
 
         # 4. 启动定时任务（间隔支持系统设置动态配置）
